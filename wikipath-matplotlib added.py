@@ -15,6 +15,7 @@ while True:
         break
 
 en_wiki_root="https://en.wikipedia.org/wiki/"
+depth_levels = []
 
 ## run at beginning of search to determine whether either search term 
 ## has no article ##
@@ -149,6 +150,8 @@ def plot_running(analytics_dict):
         x = list(range(1, len(analytics_dict)+1))
 #        ax = fig.add_subplot(1, 1, 1)
         ax.plot(x, mean_added, color='tab:orange')
+        for k in range(1, len(depth_levels)):
+            plt.vlines(depth_levels[k], 0, max(links_added), colors='red')
         ax.set_xlim([0, len(x)]); ax.set_ylim([0, max(mean_added)])
         ax.set_xlabel("Node#"); ax.set_ylabel("Cumulative mean number of links added")
         
@@ -157,7 +160,7 @@ def plot_running(analytics_dict):
         ax2.plot(x, links_added, color='tab:blue')
         ax2.set_ylim([0, max(links_added)])
         ax2.set_ylabel('Instantaneous number of links added')
-        plt.show()   
+        plt.show()
 
 # Reasoning adapted from Wikipedia's article on Breadth First Search
 def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
@@ -267,6 +270,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             max_dist = current_dist
             if verbose:
                 num_future = len(future_vertices)
+                depth_levels.append(len(analytics_dict))
                 plot_running(analytics_dict)
                 analytics_print(analytics_dict)
                 print("==========")
