@@ -35,6 +35,7 @@ while True:
 
 en_wiki_root = "https://en.wikipedia.org/wiki/"
 depth_levels = []
+ROLLING_SIZE = 100
 
 """ run at beginning of search to determine whether either search term
 has no article """
@@ -143,7 +144,12 @@ def calculate_diffs(analytics_dict):
                         articles_with_additions+1)))
     # difference between consecutive elements of list
     links_added_diff = np.ediff1d(links_added_total)
-    return links_added_diff
+    rolling_mean_added = None
+    if len(links_added_diff) >= ROLLING_SIZE:
+        lag = range(ROLLING_SIZE, len(links_added_diff)+1)
+        rolling_mean_added = [np.mean(links_added_diff[(k-ROLLING_SIZE):k])
+                              for k in lag]
+    return (links_added_diff, rolling_mean_added)
 
 
 def calculate_mean_added(analytics_dict):
@@ -155,22 +161,36 @@ def calculate_mean_added(analytics_dict):
 
 def plot_running(analytics_dict):
     if len(analytics_dict) > 1:
-        links_added = calculate_diffs(analytics_dict)
+        (instantaneous, rolling) = calculate_diffs(analytics_dict)
         mean_added = calculate_mean_added(analytics_dict)
 #        fig = plt.figure()
         fig, ax = plt.subplots(constrained_layout=True)
         x = list(range(1, len(analytics_dict)+1))
+        ax.plot(x, mean_added, color='tab:orange', linestyle='dashdot')
+        ax.set_xlim([1, len(x)]); ax.set_ylim([0, max(mean_added)])
+        
+        redundant_first = mean_added[0] / mean_added[-1] > 50
+        if redundant_first:
+            ax.set_yscale('log')
+            ax.set_ylim([1, max(mean_added)])
 #        ax = fig.add_subplot(1, 1, 1)
-        ax.plot(x, mean_added, color='tab:orange')
         for k in range(1, len(depth_levels)):
-            plt.vlines(depth_levels[k], 0, max(links_added), colors='red')
-        ax.set_xlim([0, len(x)]); ax.set_ylim([0, max(mean_added)])
-        ax.set_xlabel("Node#"); ax.set_ylabel("Cumulative mean number of links added")
+            plt.vlines(depth_levels[k], 0, max(instantaneous), colors='red')
+        # ax.set_xscale('log')
+        ax.set_xlabel("Node#")
+        ax.set_ylabel("Cumulative mean number of links added")
         
 #        secax = ax.secondary_yaxis('right') # does not set limit properly
         ax2 = ax.twinx()
-        ax2.plot(x, links_added, color='tab:blue')
-        ax2.set_ylim([0, max(links_added)])
+        ### fix transparency
+        ax2.plot(x, instantaneous, color='tab:blue', linestyle='dotted',
+                 alpha=0.5)
+        ax2.set_ylim([0, max(instantaneous)])
+        if rolling is not None:
+            ax2.plot(x[(ROLLING_SIZE-1):] , rolling, color='tab:brown')
+        if redundant_first:
+            ax2.set_yscale('log')
+            ax2.set_ylim([1, max(instantaneous)])
         ax2.set_ylabel('Instantaneous number of links added')
         plt.show()
 
