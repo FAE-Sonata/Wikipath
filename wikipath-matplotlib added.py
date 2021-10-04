@@ -127,21 +127,21 @@ def extract_path_dict(three_in_one_dict):
     return({k: tup[0] for k, tup in three_in_one_dict.items()})
 
 
-def analytics_print(analytics_dict):
-    if(len(analytics_dict.keys()) <= 10):
-        print(analytics_dict)
-    else:
-        analytics_idx = list(analytics_dict.keys())
-        analytics_vals = list(analytics_dict.values())
-        trimmed_dict = dict(zip(analytics_idx[-10:], analytics_vals[-10:]))
-        print(trimmed_dict)
-    return
+# def analytics_print(running_links_dict):
+#     if(len(running_links_dict.keys()) <= 10):
+#         print(running_links_dict)
+#     else:
+#         analytics_idx = list(running_links_dict.keys())
+#         analytics_vals = list(running_links_dict.values())
+#         trimmed_dict = dict(zip(analytics_idx[-10:], analytics_vals[-10:]))
+#         print(trimmed_dict)
+#     return
 
 
-def calculate_diffs(analytics_dict):
-    articles_with_additions = len(analytics_dict)
-    links_added_total = [0] + list(map(lambda k: analytics_dict[k][0], range(1,
-                        articles_with_additions+1)))
+def calculate_diffs(running_links_dict):
+    articles_with_additions = len(running_links_dict)
+    links_added_total = [0] + list(map(lambda k: running_links_dict[k][0],
+                                       range(1, articles_with_additions+1)))
     # difference between consecutive elements of list
     links_added_diff = np.ediff1d(links_added_total)
     rolling_mean_added = None
@@ -152,47 +152,70 @@ def calculate_diffs(analytics_dict):
     return (links_added_diff, rolling_mean_added)
 
 
-def calculate_mean_added(analytics_dict):
-    articles_with_additions = len(analytics_dict)
-    links_added_mean = list(map(lambda k: analytics_dict[k][0] / k, range(1,
-                                articles_with_additions+1)))
+def calculate_mean_added(running_links_dict):
+    articles_with_additions = len(running_links_dict)
+    links_added_mean = list(map(lambda k: running_links_dict[k][0] / k,
+                                range(1, articles_with_additions+1)))
     return links_added_mean
 
 
-def plot_running(analytics_dict):
-    if len(analytics_dict) > 1:
-        (instantaneous, rolling) = calculate_diffs(analytics_dict)
-        mean_added = calculate_mean_added(analytics_dict)
+def plot_links_added(running_links_dict):
+    if len(running_links_dict) <= 1:
+        return
+    (instantaneous, rolling) = calculate_diffs(running_links_dict)
+    mean_added = calculate_mean_added(running_links_dict)
 #        fig = plt.figure()
-        fig, ax = plt.subplots(constrained_layout=True)
-        x = list(range(1, len(analytics_dict)+1))
-        ax.plot(x, mean_added, color='tab:orange', linestyle='dashdot')
-        ax.set_xlim([1, len(x)]); ax.set_ylim([0, max(mean_added)])
-        
-        redundant_first = mean_added[0] / mean_added[-1] > 50
-        if redundant_first:
-            ax.set_yscale('log')
-            ax.set_ylim([1, max(mean_added)])
+    fig, ax = plt.subplots(constrained_layout=True)
+    x = list(range(1, len(running_links_dict)+1))
+    ax.plot(x, mean_added, color='tab:orange', linestyle='dashdot')
+    ax.set_xlim([1, len(x)]); ax.set_ylim([0, max(mean_added)])
+    
+    redundant_first = mean_added[0] / mean_added[-1] > 50
+    if redundant_first:
+        ax.set_yscale('log')
+        ax.set_ylim([1, max(mean_added)])
 #        ax = fig.add_subplot(1, 1, 1)
-        for k in range(1, len(depth_levels)):
-            plt.vlines(depth_levels[k], 0, max(instantaneous), colors='red')
-        # ax.set_xscale('log')
-        ax.set_xlabel("Node#")
-        ax.set_ylabel("Cumulative mean number of links added")
-        
+    for k in range(1, len(depth_levels)):
+        plt.vlines(depth_levels[k], 0, max(instantaneous), colors='red')
+    # ax.set_xscale('log')
+    ax.set_xlabel("Node#")
+    ax.set_ylabel("Cumulative mean number of links added")
+    
 #        secax = ax.secondary_yaxis('right') # does not set limit properly
-        ax2 = ax.twinx()
-        ### fix transparency
-        ax2.plot(x, instantaneous, color='tab:blue', linestyle='dotted',
-                 alpha=0.5)
-        ax2.set_ylim([0, max(instantaneous)])
-        if rolling is not None:
-            ax2.plot(x[(ROLLING_SIZE-1):] , rolling, color='tab:brown')
-        if redundant_first:
-            ax2.set_yscale('log')
-            ax2.set_ylim([1, max(instantaneous)])
-        ax2.set_ylabel('Instantaneous number of links added')
-        plt.show()
+    ax2 = ax.twinx()
+    # fix transparency
+    ax2.plot(x, instantaneous, color='tab:blue', linestyle='dotted',
+             alpha=0.5)
+    ax2.set_ylim([0, max(instantaneous)])
+    if rolling is not None:
+        ax2.plot(x[(ROLLING_SIZE-1):] , rolling, color='tab:brown')
+    if redundant_first:
+        ax2.set_yscale('log')
+        ax2.set_ylim([1, max(instantaneous)])
+    ax2.set_ylabel('Instantaneous number of links added')
+    plt.show()
+
+def plot_ratio(arr_ratios):
+    if len(arr_ratios) <= 1:
+        return
+    cumulative_median = [np.median(arr_ratios[:k]) for k in
+                         range(1, len(arr_ratios)+1)]
+    rolling_median = None
+    if len(arr_ratios) >= ROLLING_SIZE:
+        rolling_median = [np.median(arr_ratios[(k-ROLLING_SIZE):k]) for k in
+                          range(ROLLING_SIZE, len(arr_ratios)+1)]
+    fig, ax = plt.subplots(constrained_layout=True)
+    x = list(range(1, len(arr_ratios)+1))
+    ax.plot(x, cumulative_median, color='tab:green')
+    if rolling_median is not None:
+        ax.plot(range(ROLLING_SIZE, len(arr_ratios)+1),
+                rolling_median, color='tab:orange', linestyle='dashdot')
+    ax.set_xlim([1, len(x)]); ax.set_ylim([0, 1])
+    for k in range(1, len(depth_levels)):
+        plt.vlines(depth_levels[k], 0, 1, colors='red')
+    ax.set_xlabel("Node#")
+    ax.set_ylabel("Median ratio #links added : #links on article")
+    plt.show()
 
 # Reasoning adapted from Wikipedia's article on Breadth First Search
 def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
@@ -216,7 +239,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
     
     root = origin_term
     three_in_one_dict[root] = (None, 0, None)
-    analytics_dict = dict()
+    bfs_links_dict = dict()
+    ratio_added = []
     current_level = -1; max_dist = 0
     future_vertices.appendleft(root)
     # for progress updates during particularly large queries
@@ -264,7 +288,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             num_future = len(future_vertices)
             if((count_wikilinks > 0) and (count_wikilinks % 1000 == 0)):
                 top_links()
-                plot_running(analytics_dict)
+                plot_links_added(bfs_links_dict)
                 print("==THIS ITERATION: ", str(count_wikilinks),
                       " V; ", str(num_future),
                       " TBS; ratio of ",
@@ -279,7 +303,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                 if not(next_level in attained_levels) and len(
                         three_in_one_dict) >= next_level:
                     top_links()
-                    plot_running(analytics_dict)
+                    plot_links_added(bfs_links_dict)
                     print("Built up ", str(next_level), " entries in path",
                           " dictionary, having visited ", str(count_wikilinks),
                           " articles with ", str(num_future),
@@ -301,9 +325,9 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             max_dist = current_dist
             if verbose:
                 num_future = len(future_vertices)
-                depth_levels.append(len(analytics_dict))
-                plot_running(analytics_dict)
-                analytics_print(analytics_dict)
+                depth_levels.append(len(bfs_links_dict))
+                plot_links_added(bfs_links_dict)
+                plot_ratio(ratio_added)
                 print("==========")
                 print("Reached depth ", current_dist, " with term ",
                       subtree_root, ", having visited ", str(count_wikilinks),
@@ -327,7 +351,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
         if current_streak > max_streak:
             max_streak = current_streak
             if verbose:
-                plot_running(analytics_dict)
+                plot_links_added(bfs_links_dict)
                 print("Maximum streak extended to " + str(current_streak))
         current_streak = 0
 
@@ -341,7 +365,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                              len(links_this_page))
             top_links()
             if verbose:
-                plot_running(analytics_dict)
+                plot_links_added(bfs_links_dict)
+                plot_ratio(ratio_added)
                 print("1st degree connection:", target_article, "-->",
                       links_this_page[target_article])
                 if current_dist > 0:
@@ -382,19 +407,19 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             future_vertices.appendleft(child)
         num_new_links = len(link_children)
         num_article_links = len(links_this_page)
-        if(term_search[0] and term_search[1] is not None):
-            if(re.match(term_search[1], subtree_root) is not None
-               or num_new_links >= 1000 or num_article_links >= 2000):
-                print("^Processing " + subtree_root + " for link_children^")
-                if num_new_links == 0:
-                    print("^^No new entries were added to dictionary,",
-                          " though ", num_article_links, " unique links were",
-                          " present.^^", sep="")
-                else:
-                    print("^^Added ", num_new_links, " entries to dictionary,",
-                          " with ", num_article_links, " unique links on the page",
-                          " (", 100 * num_new_links / num_article_links,
-                          "%).^^", sep="")
+        # if(term_search[0] and term_search[1] is not None):
+        #     if(re.match(term_search[1], subtree_root) is not None
+        #        or num_new_links >= 1000 or num_article_links >= 2000):
+        #         print("^Processing " + subtree_root + " for link_children^")
+        #         if num_new_links == 0:
+        #             print("^^No new entries were added to dictionary,",
+        #                   " though ", num_article_links, " unique links were",
+        #                   " present.^^", sep="")
+        #         else:
+        #             print("^^Added ", num_new_links, " entries to dictionary,",
+        #                   " with ", num_article_links, " unique links on the page",
+        #                   " (", 100 * num_new_links / num_article_links,
+        #                   "%).^^", sep="")
         """ NOT equal to cumulative |future_vertices|, since it excludes
         disambiguation pages and redirects """
         count_wikilinks += 1
@@ -404,8 +429,10 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
         """ number of fully processed articles: (|future queue|, |path dict|)
         the ratio |future queue| / count_wikilinks is an approximation of
         the mean number of links newly added to the "future queue" """
-        analytics_dict[count_wikilinks] = (len(future_vertices),
+        bfs_links_dict[count_wikilinks] = (len(future_vertices),
                                            len(three_in_one_dict))
+        ratio = num_new_links / num_article_links if num_article_links else 0
+        ratio_added.append(ratio)
 
 
 def construct_path(destination, path_dict):
