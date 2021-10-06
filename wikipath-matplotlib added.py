@@ -225,6 +225,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
         print("Target term is a disambiguation page")
         return None
     TARGET_REDIRECTS = redirects(target_article)
+    target_section = re.compile("^" + target_article + "#.+", re.I)
     future_vertices = deque()
     visited = set(); count_wikilinks = 0
     three_in_one_dict = dict()
@@ -381,14 +382,36 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
         if len(redirects_in_links) > 0:
             print("Linked to redirect:")
             random_redirect = list(redirects_in_links)[0]
-            three_in_one_dict[random_redirect] = (subtree_root,
-                             current_dist+1, len(links_this_page))
+            three_in_one_dict[
+                random_redirect] = (subtree_root,
+                                    current_dist+1, len(links_this_page))
             if current_dist > 0:
                 print("Visited", str(count_wikilinks), "articles;", "Added",
                       str(len(three_in_one_dict)), "entries to path",
                       "dictionary")
+            if verbose:
+                plot_links_added(bfs_links_dict)
+                plot_ratio(ratio_added)
             return construct_path(random_redirect,
                                   extract_path_dict(three_in_one_dict))
+        
+        # return if any links on this page are sectional links to target article
+        matches_section = map(lambda x: re.match(target_section, x) is not
+                              None, link_names)
+        if any(matches_section):
+            print("Linked to section:")
+            section_link = list(filter(
+                lambda x: re.match(target_section, x) is not None, link_names)
+                )[0]
+            three_in_one_dict[section_link] = (subtree_root, current_dist+1,
+                                               len(links_this_page))
+            if verbose:
+                plot_links_added(bfs_links_dict)
+                plot_ratio(ratio_added)
+            return construct_path(section_link,
+                                  extract_path_dict(three_in_one_dict))
+        
+        
         # CLEAN LINKS #
         link_children = set(links_this_page.keys())
         # no self links
