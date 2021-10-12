@@ -127,17 +127,6 @@ def extract_path_dict(three_in_one_dict):
     return({k: tup[0] for k, tup in three_in_one_dict.items()})
 
 
-# def analytics_print(running_links_dict):
-#     if(len(running_links_dict.keys()) <= 10):
-#         print(running_links_dict)
-#     else:
-#         analytics_idx = list(running_links_dict.keys())
-#         analytics_vals = list(running_links_dict.values())
-#         trimmed_dict = dict(zip(analytics_idx[-10:], analytics_vals[-10:]))
-#         print(trimmed_dict)
-#     return
-
-
 def calculate_diffs(running_links_dict):
     articles_with_additions = len(running_links_dict)
     links_added_total = [0] + list(map(lambda k: running_links_dict[k][0],
@@ -164,7 +153,7 @@ def plot_links_added(running_links_dict):
         return
     (instantaneous, rolling) = calculate_diffs(running_links_dict)
     mean_added = calculate_mean_added(running_links_dict)
-#        fig = plt.figure()
+
     fig, ax = plt.subplots(constrained_layout=True)
     x = list(range(1, len(running_links_dict)+1))
     ax.plot(x, mean_added, color='tab:orange', linestyle='dashdot')
@@ -174,7 +163,7 @@ def plot_links_added(running_links_dict):
     if redundant_first:
         ax.set_yscale('log')
         ax.set_ylim([1, max(mean_added)])
-#        ax = fig.add_subplot(1, 1, 1)
+
     for k in range(1, len(depth_levels)):
         plt.vlines(depth_levels[k], 0, max(instantaneous), colors='red')
     # ax.set_xscale('log')
@@ -385,6 +374,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             three_in_one_dict[
                 random_redirect] = (subtree_root,
                                     current_dist+1, len(links_this_page))
+            top_links()
             if current_dist > 0:
                 print("Visited", str(count_wikilinks), "articles;", "Added",
                       str(len(three_in_one_dict)), "entries to path",
@@ -430,19 +420,6 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             future_vertices.appendleft(child)
         num_new_links = len(link_children)
         num_article_links = len(links_this_page)
-        # if(term_search[0] and term_search[1] is not None):
-        #     if(re.match(term_search[1], subtree_root) is not None
-        #        or num_new_links >= 1000 or num_article_links >= 2000):
-        #         print("^Processing " + subtree_root + " for link_children^")
-        #         if num_new_links == 0:
-        #             print("^^No new entries were added to dictionary,",
-        #                   " though ", num_article_links, " unique links were",
-        #                   " present.^^", sep="")
-        #         else:
-        #             print("^^Added ", num_new_links, " entries to dictionary,",
-        #                   " with ", num_article_links, " unique links on the page",
-        #                   " (", 100 * num_new_links / num_article_links,
-        #                   "%).^^", sep="")
         """ NOT equal to cumulative |future_vertices|, since it excludes
         disambiguation pages and redirects """
         count_wikilinks += 1
