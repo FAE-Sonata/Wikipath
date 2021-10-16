@@ -11,6 +11,7 @@ re_permlink = re.compile("Permanent link")
 re_title = re.compile("title=")
 re_oldid = re.compile("&oldid=")
 wiki_regex = re.compile("^/wiki/")
+## example of improper disambiguation added: Baidu --> Kaiser Kuo search
 cat_disambig_re = re.compile("^/wiki/Category:.*(D|d)isambiguation", re.I)
 needs_dab_re = re.compile("^/wiki/.*needing_disambiguation", re.I)
 
@@ -50,11 +51,17 @@ def find_actual_title_helper(soup_from_page):
     link_titles = soup_from_page.find_all('a', title=True)
     title_text = [elem['title'] for elem in link_titles]
     # live articles should have ONE permanent link with revision ID
+    has_oldid = [re.search(re_oldid,x['href']) is not None for x in
+                 link_titles]
+    idx_oldid = np.where(has_oldid)
+    
     has_perm = [re.search(re_permlink,x) is not None for x in title_text]
     idx_perm = np.where(has_perm)
-    if len(idx_perm[0]) != 1:
+    if len(idx_oldid[0]) != 1:
         return None
-    perm_link_suffix = link_titles[idx_perm[0][0]]['href']
+    assert(idx_oldid[0][0] in idx_perm[0])
+    
+    perm_link_suffix = link_titles[idx_oldid[0][0]]['href']
     char_idx_title = re.search(re_title, perm_link_suffix).end()
     char_idx_old_id = re.search(re_oldid, perm_link_suffix).start()
     return perm_link_suffix[char_idx_title:char_idx_old_id]
@@ -174,7 +181,7 @@ def plot_links_added(running_links_dict):
     ax2 = ax.twinx()
     # fix transparency
     ax2.plot(x, instantaneous, color='tab:blue', linestyle='dotted',
-             alpha=0.5)
+             alpha=0.25)
     ax2.set_ylim([0, max(instantaneous)])
     if rolling is not None:
         ax2.plot(x[(ROLLING_SIZE-1):] , rolling, color='tab:brown')
