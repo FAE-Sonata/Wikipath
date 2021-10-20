@@ -36,6 +36,8 @@ while True:
 
 en_wiki_root = "https://en.wikipedia.org/wiki/"
 depth_levels = []
+NUM_TOP_LINKS = 10
+top_link_tuples = None
 ROLLING_SIZE = 100
 
 """ run at beginning of search to determine whether either search term
@@ -57,11 +59,12 @@ def find_actual_title_helper(soup_from_page):
     
     has_perm = [re.search(re_permlink,x) is not None for x in title_text]
     idx_perm = np.where(has_perm)
-    if len(idx_oldid[0]) != 1:
+    if not(len(idx_oldid[0])):
         return None
-    assert(idx_oldid[0][0] in idx_perm[0])
+    final_idx = (set(idx_oldid[0])).intersection(set(idx_perm[0]))
+    assert(len(final_idx))
     
-    perm_link_suffix = link_titles[idx_oldid[0][0]]['href']
+    perm_link_suffix = link_titles[list(final_idx)[0]]['href']
     char_idx_title = re.search(re_title, perm_link_suffix).end()
     char_idx_old_id = re.search(re_oldid, perm_link_suffix).start()
     return perm_link_suffix[char_idx_title:char_idx_old_id]
@@ -249,6 +252,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
     def top_links():
         """ analytics: sorting visited articles at previous level by
         number of links on page """
+        global top_link_tuples
         unique_visited = visited.intersection(three_in_one_dict.keys())
         # zip together dictionary {article: links}, reverse sort
         terms_prev_lv = list(filter(lambda k:
@@ -256,10 +260,35 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
         num_links = [link_dict[k] for k in terms_prev_lv]
         link_tuples = list(zip(terms_prev_lv, num_links))
         link_tuples.sort(key=lambda tup: tup[1], reverse=True)
-        if len(link_tuples) > 10:
-            print(link_tuples[:10])
-        else:
+        if len(link_tuples) <= NUM_TOP_LINKS:
+            top_link_tuples = link_tuples
             print(link_tuples)
+        else:
+            if top_link_tuples != link_tuples:
+                prior_top = set()
+                if top_link_tuples is not None:
+                    prior_top = set([tup[0] for tup in top_link_tuples])
+                new_top = set([tup[0] for tup in link_tuples[:NUM_TOP_LINKS]])
+                removed = prior_top.difference(new_top)
+                if len(removed):
+                    removed_tuples = [tup for tup in top_link_tuples if tup[0]
+                                      in removed]
+                    print("----------")
+                    print("No longer in top %d: %s" % (NUM_TOP_LINKS,
+                                                       removed_tuples))
+                added = new_top.difference(prior_top)
+                if len(added):
+                    added_tuples = [tup for tup in link_tuples if tup[0] in
+                                    added]
+                    print("++++++++++")
+                    print("Added to top %d: %s" % (NUM_TOP_LINKS,
+                                                   added_tuples))
+                top_link_tuples = link_tuples[:NUM_TOP_LINKS]
+                
+        # if len(link_tuples) > 10:
+            # print(link_tuples[:10])
+        # else:
+        #     print(link_tuples)
     while len(future_vertices) > 0:
         # remove next article off Queue (future_vertices) to examine #
         subtree_root = future_vertices.pop()
