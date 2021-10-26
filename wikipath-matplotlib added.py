@@ -11,8 +11,8 @@ re_permlink = re.compile("Permanent link")
 re_title = re.compile("title=")
 re_oldid = re.compile("&oldid=")
 wiki_regex = re.compile("^/wiki/")
-## example of improper disambiguation added: Baidu --> Kaiser Kuo search
-cat_disambig_re = re.compile("^/wiki/Category:.*(D|d)isambiguation", re.I)
+cat_disambig_re = re.compile("^/wiki/Category:.*(D|d)isambiguation.*page(s)",
+                             re.I)
 needs_dab_re = re.compile("^/wiki/.*needing_disambiguation", re.I)
 
 """ exclude non-mainspace article pages on Wiki, i.e. those with the
