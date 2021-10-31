@@ -37,6 +37,7 @@ while True:
 en_wiki_root = "https://en.wikipedia.org/wiki/"
 depth_levels = []
 NUM_TOP_LINKS = 10
+SWITCH_TO_LOG = 10 ** 1.5
 top_link_tuples = None
 ROLLING_SIZE = 100
 
@@ -166,10 +167,11 @@ def plot_links_added(running_links_dict):
 
     fig, ax = plt.subplots(constrained_layout=True)
     x = list(range(1, len(running_links_dict)+1))
-    ax.plot(x, mean_added, color='tab:orange', linestyle='dashdot')
+    ax.plot(x, mean_added, color='tab:orange', linestyle='dashdot',
+            label='Cumulative mean')
     ax.set_xlim([1, len(x)]); ax.set_ylim([0, max(mean_added)])
     
-    redundant_first = mean_added[0] / mean_added[-1] > 50
+    redundant_first = mean_added[0] / mean_added[-1] > SWITCH_TO_LOG
     if redundant_first:
         ax.set_yscale('log')
         ax.set_ylim([1, max(mean_added)])
@@ -184,14 +186,17 @@ def plot_links_added(running_links_dict):
     ax2 = ax.twinx()
     # fix transparency
     ax2.plot(x, instantaneous, color='tab:blue', linestyle='dotted',
-             alpha=0.25)
+             alpha=0.25,
+             label='Instantaneous added')
     ax2.set_ylim([0, max(instantaneous)])
     if rolling is not None:
-        ax2.plot(x[(ROLLING_SIZE-1):] , rolling, color='tab:brown')
+        ax2.plot(x[(ROLLING_SIZE-1):] , rolling, color='tab:brown',
+                 label='Rolling %d average' % ROLLING_SIZE)
     if redundant_first:
         ax2.set_yscale('log')
         ax2.set_ylim([1, max(instantaneous)])
     ax2.set_ylabel('Instantaneous number of links added')
+    ax2.legend(loc='upper right', shadow=True)
     plt.show()
 
 def plot_ratio(arr_ratios):
@@ -205,15 +210,18 @@ def plot_ratio(arr_ratios):
                           range(ROLLING_SIZE, len(arr_ratios)+1)]
     fig, ax = plt.subplots(constrained_layout=True)
     x = list(range(1, len(arr_ratios)+1))
-    ax.plot(x, cumulative_median, color='tab:green')
+    ax.plot(x, cumulative_median, color='tab:green',
+            label='Cumulative')
     if rolling_median is not None:
         ax.plot(range(ROLLING_SIZE, len(arr_ratios)+1),
-                rolling_median, color='tab:orange', linestyle='dashdot')
+                rolling_median, color='tab:orange', linestyle='dashdot',
+                label='Rolling %d median' % ROLLING_SIZE)
     ax.set_xlim([1, len(x)]); ax.set_ylim([0, 1])
     for k in range(1, len(depth_levels)):
         plt.vlines(depth_levels[k], 0, 1, colors='red')
     ax.set_xlabel("Node#")
     ax.set_ylabel("Median ratio #links added : #links on article")
+    ax.legend(loc='upper right', shadow=True)
     plt.show()
 
 # Reasoning adapted from Wikipedia's article on Breadth First Search
@@ -315,14 +323,12 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             if((count_wikilinks > 0) and (count_wikilinks % 1000 == 0)):
                 top_links()
                 plot_links_added(bfs_links_dict)
-                print("==THIS ITERATION: ", str(count_wikilinks),
-                      " V; ", str(num_future),
-                      " TBS; ratio of ",
-                      str(float(num_future) / float(count_wikilinks)), "; ",
-                      str(noentry_count), " links with no article, ",
-                      str(disambig_count), " disambiguation pages, ",
-                      str(redirect_count), " redirects==",
-                      sep="")
+                one = "==THIS ITERATION: %d V; %d TBS; ratio of %f; %d " % (
+                    count_wikilinks, num_future, num_future/count_wikilinks,
+                    noentry_count)
+                two = "links with no article, %d disambiguation pages, %d" % (
+                    disambig_count, redirect_count)
+                print(one + two + " redirects==")
             # referring to certain milestones for |path_dict|, e.g. 100K, 1M
             if(current_level + 1 < len(levels)):
                 next_level = levels[current_level + 1]
@@ -330,16 +336,16 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                         three_in_one_dict) >= next_level:
                     top_links()
                     plot_links_added(bfs_links_dict)
-                    print("Built up ", str(next_level), " entries in path",
-                          " dictionary, having visited ", str(count_wikilinks),
-                          " articles with ", str(num_future),
-                          " to be explored (ratio of ",
-                          str(num_future / count_wikilinks),
-                          "); ",
-                          str(noentry_count), " links with no article, ",
-                          str(disambig_count), " disambiguation pages, ",
-                          str(redirect_count), " redirects==",
-                          sep="")
+                    one = "Built up %d entries in path dictionary, having" % (
+                        next_level)
+                    two = " visited %d articles with %d to be explored " % (
+                        count_wikilinks, num_future)
+                    tri = "(ratio of %f); %d links with no article, %d " % (
+                        num_future / count_wikilinks, noentry_count,
+                        disambig_count)
+                    four= "disambiguation pages, %d redirects==" % (
+                        redirect_count)
+                    print(one + two + tri + four)
                     attained_levels.add(next_level)
                     current_level += 1
        
@@ -355,12 +361,11 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                 plot_links_added(bfs_links_dict)
                 plot_ratio(ratio_added)
                 print("==========")
-                print("Reached depth ", current_dist, " with term ",
-                      subtree_root, ", having visited ", str(count_wikilinks),
-                      " articles and with ", str(num_future),
-                      " to be explored (ratio of ",
-                      str(num_future / count_wikilinks), ")",
-                      sep="")
+                one = "Reached depth %d with term %s, having visited %d" % (
+                    current_dist, subtree_root, count_wikilinks)
+                two = " articles and with %d to be explored (ratio of %f)" % (
+                    num_future, num_future / count_wikilinks)
+                print(one + two)
         if subtree_root == target_article: # can only happen with redirects
             return construct_path(subtree_root, extract_path_dict(
                     three_in_one_dict))
@@ -378,7 +383,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             max_streak = current_streak
             if verbose:
                 plot_links_added(bfs_links_dict)
-                print("Maximum streak extended to " + str(current_streak))
+                print("Maximum streak extended to %d" % current_streak)
         current_streak = 0
 
         link_dict[subtree_root] = len(links_this_page)
@@ -393,12 +398,17 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             if verbose:
                 plot_links_added(bfs_links_dict)
                 plot_ratio(ratio_added)
-                print("1st degree connection:", target_article, "-->",
+                print("1st degree connection:", target_article, "<--",
                       links_this_page[target_article])
                 if current_dist > 0:
-                    print("Visited", str(count_wikilinks), "articles;",
-                          "Added", str(len(three_in_one_dict)),
-                          "entries to path dictionary")
+                    print("**********")
+                    one = "Visited %d articles; Added %d entries to path " % (
+                        count_wikilinks, len(three_in_one_dict))
+                    two = "dictionary, with %d still to be visited at " % (
+                        num_future)
+                    tri = "conclusion (ratio of %f)" % (
+                        num_future / count_wikilinks)
+                    print(one + two + tri)
             return construct_path(target_article, extract_path_dict(
                     three_in_one_dict))
 
@@ -412,9 +422,14 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                                     current_dist+1, len(links_this_page))
             top_links()
             if current_dist > 0:
-                print("Visited", str(count_wikilinks), "articles;", "Added",
-                      str(len(three_in_one_dict)), "entries to path",
-                      "dictionary")
+                print("**********")
+                one = "Visited %d articles; Added %d entries to path " % (
+                    count_wikilinks, len(three_in_one_dict))
+                two = "dictionary, with %d still to be visited at " % (
+                    num_future)
+                tri = "conclusion (ratio of %f)" % (
+                    num_future / count_wikilinks)
+                print(one + two + tri)
             if verbose:
                 plot_links_added(bfs_links_dict)
                 plot_ratio(ratio_added)
