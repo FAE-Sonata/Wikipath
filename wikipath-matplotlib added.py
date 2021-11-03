@@ -194,7 +194,7 @@ def plot_links_added(running_links_dict):
         ax2.set_yscale('log')
         ax2.set_ylim([1, max(instant)])
     ax2.set_ylabel('Instantaneous number of links added')
-    
+    # https://stackoverflow.com/questions/5484922/secondary-axis-with-twinx-how-to-add-to-legend
     labels = [l.get_label() for l in combined_lines]
     ax.legend(combined_lines, labels, loc='upper right', shadow=True)
     plt.show()
