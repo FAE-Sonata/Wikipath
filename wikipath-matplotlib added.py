@@ -49,7 +49,6 @@ def has_article(search_term):
     req_attempt = requests.get(en_wiki_root + search_term)
     return(req_attempt.status_code != 404)
 
-
 def find_actual_title_helper(soup_from_page):
     link_titles = soup_from_page.find_all('a', title=True)
     title_text = [elem['title'] for elem in link_titles]
@@ -69,7 +68,6 @@ def find_actual_title_helper(soup_from_page):
     char_idx_title = re.search(re_title, perm_link_suffix).end()
     char_idx_old_id = re.search(re_oldid, perm_link_suffix).start()
     return perm_link_suffix[char_idx_title:char_idx_old_id]
-
 
 def find_actual_title(s):
     page = requests.get(en_wiki_root + s)
@@ -98,7 +96,6 @@ def links_on_page(search_term):
     # also exclude the Main Page, which changes daily and will lead to
     # unstable results
     
-    
     article_links = list(filter(lambda x: re.search(wiki_regex, x) is not None and
                                re.search(non_article_regex, x) == None, hrefs))
     # "/wiki/" is 6 characters
@@ -125,7 +122,7 @@ def redirects(search_term):
     soup_from_page = BeautifulSoup(links_page.text, 'html.parser')
     a_tags = soup_from_page.find_all('a',href=True)
     hrefs = [elem['href'] for elem in a_tags]
-    redirect_re = re.compile("&redirect=no") #re.compile("/w/index\.php?title=.+&redirect=no")
+    redirect_re = re.compile("&redirect=no")
     redirect_links = list(filter(lambda x: re.search(redirect_re, x) is not None,
                                  hrefs))
     LEN_PREFIX = len("/w/index.php?title=")
@@ -136,7 +133,6 @@ def redirects(search_term):
 # condensed version of dictionary: only [key, child] duples returned
 def extract_path_dict(three_in_one_dict):
     return({k: tup[0] for k, tup in three_in_one_dict.items()})
-
 
 def calculate_diffs(running_links_dict):
     articles_with_additions = len(running_links_dict)
@@ -151,24 +147,22 @@ def calculate_diffs(running_links_dict):
                               for k in lag]
     return (links_added_diff, rolling_mean_added)
 
-
 def calculate_mean_added(running_links_dict):
     articles_with_additions = len(running_links_dict)
     links_added_mean = list(map(lambda k: running_links_dict[k][0] / k,
                                 range(1, articles_with_additions+1)))
     return links_added_mean
 
-
 def plot_links_added(running_links_dict):
     if len(running_links_dict) <= 1:
         return
-    (instantaneous, rolling) = calculate_diffs(running_links_dict)
+    (instant, rolling) = calculate_diffs(running_links_dict)
     mean_added = calculate_mean_added(running_links_dict)
 
     fig, ax = plt.subplots(constrained_layout=True)
     x = list(range(1, len(running_links_dict)+1))
-    ax.plot(x, mean_added, color='tab:orange', linestyle='dashdot',
-            label='Cumulative mean')
+    line_cumul = ax.plot(x, mean_added, color='tab:orange',
+                         linestyle='dashdot', label='Cumulative mean')
     ax.set_xlim([1, len(x)]); ax.set_ylim([0, max(mean_added)])
     
     redundant_first = mean_added[0] / mean_added[-1] > SWITCH_TO_LOG
@@ -177,26 +171,32 @@ def plot_links_added(running_links_dict):
         ax.set_ylim([1, max(mean_added)])
 
     for k in range(1, len(depth_levels)):
-        plt.vlines(depth_levels[k], 0, max(instantaneous), colors='red')
+        plt.vlines(depth_levels[k], 0, max(instant), colors='red')
     # ax.set_xscale('log')
     ax.set_xlabel("Node#")
     ax.set_ylabel("Cumulative mean number of links added")
     
-#        secax = ax.secondary_yaxis('right') # does not set limit properly
     ax2 = ax.twinx()
-    # fix transparency
-    ax2.plot(x, instantaneous, color='tab:blue', linestyle='dotted',
-             alpha=0.25,
-             label='Instantaneous added')
-    ax2.set_ylim([0, max(instantaneous)])
+    # alpha fixes transparency so the 2 other lines are not overwhelmed
+    line_instant = ax2.plot(x, instant, color='tab:blue', linestyle='dotted',
+                            alpha=0.25, label='Instantaneous added')
+    ax2.set_ylim([0, max(instant)])
+    line_rolling = None
     if rolling is not None:
-        ax2.plot(x[(ROLLING_SIZE-1):] , rolling, color='tab:brown',
-                 label='Rolling %d average' % ROLLING_SIZE)
+        line_rolling = ax2.plot(x[(ROLLING_SIZE-1):], rolling,
+                                color='tab:brown',
+                                label='Rolling %d average' % ROLLING_SIZE)
+    if line_rolling:
+        combined_lines = line_cumul + line_instant + line_rolling
+    else:
+        combined_lines = line_cumul + line_instant
     if redundant_first:
         ax2.set_yscale('log')
-        ax2.set_ylim([1, max(instantaneous)])
+        ax2.set_ylim([1, max(instant)])
     ax2.set_ylabel('Instantaneous number of links added')
-    ax2.legend(loc='upper right', shadow=True)
+    
+    labels = [l.get_label() for l in combined_lines]
+    ax.legend(combined_lines, labels, loc='upper right', shadow=True)
     plt.show()
 
 def plot_ratio(arr_ratios):
@@ -293,10 +293,6 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                                                    added_tuples))
                 top_link_tuples = link_tuples[:NUM_TOP_LINKS]
                 
-        # if len(link_tuples) > 10:
-            # print(link_tuples[:10])
-        # else:
-        #     print(link_tuples)
     while len(future_vertices) > 0:
         # remove next article off Queue (future_vertices) to examine #
         subtree_root = future_vertices.pop()
@@ -310,13 +306,9 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                 print("Dead end: " + subtree_root)
             # next entry in Queue (future_vertices); nothing to be done
             continue
-        # encountered redirect off the Queue (future_vertices)
+        # encountered redirect off Queue (future_vertices), nothing to be done
         if(actual_title in visited):
             redirect_count += 1; current_streak += 1
-#            if verbose:
-#                print("Encountered redirect or term was previously visited:",
-#                      subtree_root)
-            # next entry in Queue (future_vertices); nothing to be done
             continue
         if verbose:
             num_future = len(future_vertices)
@@ -450,8 +442,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                 plot_links_added(bfs_links_dict)
                 plot_ratio(ratio_added)
             return construct_path(section_link,
-                                  extract_path_dict(three_in_one_dict))
-        
+                                  extract_path_dict(three_in_one_dict))        
         
         # CLEAN LINKS #
         link_children = set(links_this_page.keys())
@@ -484,7 +475,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                                            len(three_in_one_dict))
         ratio = num_new_links / num_article_links if num_article_links else 0
         ratio_added.append(ratio)
-
+        # end of cycle in while loop
 
 def construct_path(destination, path_dict):
     article_list = list()
@@ -496,7 +487,6 @@ def construct_path(destination, path_dict):
     article_list.reverse()
     article_list.append(destination)
     return article_list
-
 
 def process(s1, s2):
     valid1 = has_article(s1); valid2 = has_article(s2)
