@@ -172,7 +172,7 @@ def plot_links_added(running_links_dict):
 
     for k in range(1, len(depth_levels)):
         plt.vlines(depth_levels[k], 0, max(instant), colors='red')
-    # ax.set_xscale('log')
+
     ax.set_xlabel("Node#")
     ax.set_ylabel("Cumulative mean number of links added")
     
@@ -198,6 +198,7 @@ def plot_links_added(running_links_dict):
     labels = [l.get_label() for l in combined_lines]
     ax.legend(combined_lines, labels, loc='upper right', shadow=True)
     plt.show()
+    return (mean_added, rolling)
 
 def plot_ratio(arr_ratios):
     if len(arr_ratios) <= 1:
@@ -220,9 +221,10 @@ def plot_ratio(arr_ratios):
     for k in range(1, len(depth_levels)):
         plt.vlines(depth_levels[k], 0, 1, colors='red')
     ax.set_xlabel("Node#")
-    ax.set_ylabel("Median ratio #links added : #links on article")
+    ax.set_ylabel("Median ratio |links added| : |links on article|")
     ax.legend(loc='upper right', shadow=True)
     plt.show()
+    return (cumulative_median, rolling_median)
 
 # Reasoning adapted from Wikipedia's article on Breadth First Search
 def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
@@ -257,6 +259,45 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
     levels.sort()
     # tracking based on the levels above
     attained_levels = set()
+    def final_plot():
+        # what occurs if None
+        (cumulative_mean, rolling_mean) = plot_links_added(bfs_links_dict)
+        (cumulative_median, rolling_median) = plot_ratio(ratio_added)
+        def subplot(series_mean, series_median, x, cumulative):
+            fig, ax = plt.subplots(constrained_layout=True)
+            # x = list(range(1, len(series_mean)+1))
+            line_cmean = ax.plot(x, series_mean, color='tab:orange',
+                                 label='Mean links added')
+            ax.set_xlim([min(x), max(x)]); ax.set_ylim([0, max(series_mean)])
+        
+            for k in range(1, len(depth_levels)):
+                plt.vlines(depth_levels[k], 0, max(series_mean), colors='red')
+            ax.set_xlabel("Node#")
+            ax.set_ylabel("Mean number of links newly added")
+            
+            ax2 = ax.twinx()
+            # alpha fixes transparency so the 2 other lines are not overwhelmed
+            line_cmedian = ax2.plot(x, series_median, color='tab:green',
+                                    label='Median ratio')
+            combined_lines = line_cmean + line_cmedian
+            
+            ax2.set_ylim([0, 1])
+            ax2.set_ylabel('Median ratio |links added| : |links on article|')
+            labels = [l.get_label() for l in combined_lines]
+            ax.legend(combined_lines, labels, loc='upper right', shadow=True)
+            # non-diagonal element of Numpy output
+            series_corr = np.corrcoef(series_mean, series_median)[0][1]
+            if cumulative:
+                plt.title(f'Cumulative correlation: {series_corr:.4f}')
+            else:
+                plt.title(f'Rolling correlation: {series_corr:.4f}')
+            plt.show()
+        subplot(cumulative_mean, cumulative_median,
+                list(range(1, len(cumulative_mean)+1)), True)
+        if rolling_mean and rolling_median:
+            subplot(rolling_mean, rolling_median,
+                    list(range(ROLLING_SIZE, len(cumulative_mean)+1)), False)
+    
     def top_links():
         """ analytics: sorting visited articles at previous level by
         number of links on page """
@@ -388,8 +429,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                              len(links_this_page))
             top_links()
             if verbose:
-                plot_links_added(bfs_links_dict)
-                plot_ratio(ratio_added)
+                final_plot()
                 print("1st degree connection:", target_article, "<--",
                       links_this_page[target_article])
                 if current_dist > 0:
@@ -423,8 +463,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                     num_future / count_wikilinks)
                 print(one + two + tri)
             if verbose:
-                plot_links_added(bfs_links_dict)
-                plot_ratio(ratio_added)
+                final_plot()
             return construct_path(random_redirect,
                                   extract_path_dict(three_in_one_dict))
         
@@ -439,8 +478,7 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
             three_in_one_dict[section_link] = (subtree_root, current_dist+1,
                                                len(links_this_page))
             if verbose:
-                plot_links_added(bfs_links_dict)
-                plot_ratio(ratio_added)
+                final_plot()
             return construct_path(section_link,
                                   extract_path_dict(three_in_one_dict))        
         
