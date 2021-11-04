@@ -36,10 +36,11 @@ while True:
 
 en_wiki_root = "https://en.wikipedia.org/wiki/"
 depth_levels = []
-NUM_TOP_LINKS = 10
-SWITCH_TO_LOG = 10 ** 1.5
-top_link_tuples = None
-ROLLING_SIZE = 100
+NUM_TOP_LINKS = 10; top_link_tuples = None
+SWITCH_TO_LOG = 10 ** 1.5; ROLLING_SIZE = 100
+
+RIGHT_BEGIN = 0.6; MIN_CLEARANCE_PRE_ROLLING = 0.15; MIN_CLEARANCE = 0.2
+RESIZE_FACTOR = 1.25
 
 """ run at beginning of search to determine whether either search term
 has no article """
@@ -163,9 +164,18 @@ def plot_links_added(running_links_dict):
     x = list(range(1, len(running_links_dict)+1))
     line_cumul = ax.plot(x, mean_added, color='tab:orange',
                          linestyle='dashdot', label='Cumulative mean')
-    ax.set_xlim([1, len(x)]); ax.set_ylim([0, max(mean_added)])
+    # resize left axis if legend is interfering with cumulative mean line
+    left_upper = max(mean_added)
+    right_max = max(mean_added[(int(RIGHT_BEGIN * len(mean_added))):])
+    exceeds_pre = len(mean_added) < ROLLING_SIZE and right_max > (
+        1 - MIN_CLEARANCE_PRE_ROLLING) * max(mean_added)
+    exceeds = len(mean_added) >= ROLLING_SIZE and right_max > (
+        1 - MIN_CLEARANCE) * max(mean_added)
+    if exceeds_pre or exceeds:
+        left_upper *= RESIZE_FACTOR
+    ax.set_xlim([1, len(x)]); ax.set_ylim([0, left_upper])
     
-    redundant_first = mean_added[0] / mean_added[-1] > SWITCH_TO_LOG
+    redundant_first = max(mean_added) / mean_added[-1] > SWITCH_TO_LOG
     if redundant_first:
         ax.set_yscale('log')
         ax.set_ylim([1, max(mean_added)])
@@ -260,9 +270,12 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
     # tracking based on the levels above
     attained_levels = set()
     def final_plot():
-        # what occurs if None
-        (cumulative_mean, rolling_mean) = plot_links_added(bfs_links_dict)
-        (cumulative_median, rolling_median) = plot_ratio(ratio_added)
+        res_links = plot_links_added(bfs_links_dict)
+        res_ratio = plot_ratio(ratio_added)
+        if res_links is None or res_ratio is None:
+            return
+        (cumulative_mean, rolling_mean) = res_links
+        (cumulative_median, rolling_median) = res_ratio
         def subplot(series_mean, series_median, x, cumulative):
             fig, ax = plt.subplots(constrained_layout=True)
             # x = list(range(1, len(series_mean)+1))
