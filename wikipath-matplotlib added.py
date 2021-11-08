@@ -27,6 +27,7 @@ pipe = "|"
 regex_prefixes = pipe.join(prefixes_complete)
 non_article_regex = re.compile("^/wiki/((" + regex_prefixes + ":)|Main_Page)",
                                re.I)
+regraph_links_dict = None
 while True:
     choice = input("Import search terms from a .CSV (Y/N)?: ")
     if re.match(re.compile("^([YN]|Yes|No)$", re.I), choice) is not None:
@@ -40,7 +41,7 @@ NUM_TOP_LINKS = 10; top_link_tuples = None
 SWITCH_TO_LOG = 10 ** 1.5; ROLLING_SIZE = 100
 
 RIGHT_BEGIN = 0.6; MIN_CLEARANCE_PRE_ROLLING = 0.15; MIN_CLEARANCE = 0.2
-RESIZE_FACTOR = 1.25
+RESIZE_FACTOR = 1.3
 
 """ run at beginning of search to determine whether either search term
 has no article """
@@ -154,7 +155,7 @@ def calculate_mean_added(running_links_dict):
                                 range(1, articles_with_additions+1)))
     return links_added_mean
 
-def plot_links_added(running_links_dict):
+def plot_links_added(running_links_dict, rescale=True):
     if len(running_links_dict) <= 1:
         return
     (instant, rolling) = calculate_diffs(running_links_dict)
@@ -175,8 +176,8 @@ def plot_links_added(running_links_dict):
         left_upper *= RESIZE_FACTOR
     ax.set_xlim([1, len(x)]); ax.set_ylim([0, left_upper])
     
-    redundant_first = max(mean_added) / mean_added[-1] > SWITCH_TO_LOG
-    if redundant_first:
+    large_first = max(mean_added) / mean_added[-1] > SWITCH_TO_LOG
+    if large_first and rescale:
         ax.set_yscale('log')
         ax.set_ylim([1, max(mean_added)])
 
@@ -200,7 +201,7 @@ def plot_links_added(running_links_dict):
         combined_lines = line_cumul + line_instant + line_rolling
     else:
         combined_lines = line_cumul + line_instant
-    if redundant_first:
+    if large_first and rescale:
         ax2.set_yscale('log')
         ax2.set_ylim([1, max(instant)])
     ax2.set_ylabel('Instantaneous number of links added')
@@ -413,8 +414,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                     num_future, num_future / count_wikilinks)
                 print(one + two)
         if subtree_root == target_article: # can only happen with redirects
-            return construct_path(subtree_root, extract_path_dict(
-                    three_in_one_dict))
+            return (bfs_links_dict, construct_path(subtree_root, extract_path_dict(
+                    three_in_one_dict)))
             
         links_this_page = links_on_page(subtree_root)
         if(links_this_page == None): # Skipping: Disambiguation page, not an article
@@ -454,8 +455,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                     tri = "conclusion (ratio of %f)" % (
                         num_future / count_wikilinks)
                     print(one + two + tri)
-            return construct_path(target_article, extract_path_dict(
-                    three_in_one_dict))
+            return (bfs_links_dict, construct_path(target_article, extract_path_dict(
+                    three_in_one_dict)))
 
         # return if any links on this page are REDIRECTS to target article
         redirects_in_links = link_names.intersection(TARGET_REDIRECTS)
@@ -477,8 +478,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                 print(one + two + tri)
             if verbose:
                 final_plot()
-            return construct_path(random_redirect,
-                                  extract_path_dict(three_in_one_dict))
+            return (bfs_links_dict, construct_path(random_redirect,
+                                  extract_path_dict(three_in_one_dict)))
         
         # return if any links on this page are sectional links to target article
         matches_section = map(lambda x: re.match(target_section, x) is not
@@ -492,8 +493,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                                                len(links_this_page))
             if verbose:
                 final_plot()
-            return construct_path(section_link,
-                                  extract_path_dict(three_in_one_dict))        
+            return (bfs_links_dict, construct_path(section_link,
+                                  extract_path_dict(three_in_one_dict)))
         
         # CLEAN LINKS #
         link_children = set(links_this_page.keys())
@@ -555,12 +556,13 @@ def process(s1, s2):
                   " redirect to " + article1)
         else:
             print("PROCESSING '%s' and '%s'" % (s1, s2))
-            resultant_path = bfs(article1,
+            (links_dict, resultant_path) = bfs(article1,
                                  article2,
                                  # term_search=(False, None),
                                  # can use re.compile("...")
                                  verbose=True)
             print(resultant_path)
+            return links_dict
 
 if is_csv_input:
     df_input = pd.read_csv("Sample Wikipedia inputs.csv")
@@ -576,4 +578,4 @@ if is_csv_input:
 else:
     term1 = input("Enter search term 1: ")
     term2 = input("Enter search term 2: ")
-    process(term1, term2)
+    regraph_links_dict = process(term1, term2)
