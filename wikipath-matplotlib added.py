@@ -118,19 +118,40 @@ def links_on_page(search_term):
 def redirects(search_term):
     LEN_IKI = len("iki/")
     links_page_root = en_wiki_root[:-LEN_IKI]
-    links_page_root += "/index.php?title=Special%3AWhat"
-    links_page_root += "LinksHere&limit=500&hidetrans=1&hidelinks=1&target="
+    links_page_root += "/index.php?title=Special%3AWhatLinksHere"
+    links_page_root += "&limit=500&hidetrans=1&hidelinks=1&target="
     links_page = requests.get(links_page_root + search_term)
     soup_from_page = BeautifulSoup(links_page.text, 'html.parser')
     a_tags = soup_from_page.find_all('a',href=True)
     hrefs = [elem['href'] for elem in a_tags]
     redirect_re = re.compile("&redirect=no")
-    redirect_links = list(filter(lambda x: re.search(redirect_re, x) is not None,
-                                 hrefs))
+    redirect_links = list(filter(
+        lambda x: re.search(redirect_re, x) is not None, hrefs))
     LEN_PREFIX = len("/w/index.php?title=")
     LEN_REDIRECT = len("&redirect=no")
     redirects = [lk[LEN_PREFIX:-LEN_REDIRECT] for lk in redirect_links]
     return(set(redirects))
+
+def links_to(search_term):
+    LEN_IKI = len("iki/")
+    links_page_root = en_wiki_root[:-LEN_IKI]
+    links_page_root += "/index.php?title=Special%3AWhatLinksHere/"
+    links_page_root += search_term + "&namespace=0&hideredirs=1&limit=500"
+    links_page = requests.get(links_page_root + search_term)
+    soup_from_page = BeautifulSoup(links_page.text, 'html.parser')
+    a_tags = soup_from_page.find_all('a',href=True)
+    # more than 500 links to page
+    if 'next 500' in [elem.get_text() for elem in a_tags]:
+        return None
+    hrefs = [elem['href'] for elem in a_tags]
+    edit_re = re.compile("&action=edit")
+    edit_links = list(filter(lambda x: re.search(edit_re, x) is not None,
+                              hrefs))
+    LEN_PREFIX = len("/w/index.php?title=")
+    LEN_AEDIT = len("&action=edit")
+    links_to_target = set([lk[LEN_PREFIX:-LEN_AEDIT] for lk in edit_links])
+    links_to_target.discard(search_term)
+    return(links_to_target)
 
 # condensed version of dictionary: only [key, child] duples returned
 def extract_path_dict(three_in_one_dict):
@@ -414,8 +435,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                     num_future, num_future / count_wikilinks)
                 print(one + two)
         if subtree_root == target_article: # can only happen with redirects
-            return (bfs_links_dict, construct_path(subtree_root, extract_path_dict(
-                    three_in_one_dict)))
+            return (bfs_links_dict, construct_path(
+                subtree_root, extract_path_dict(three_in_one_dict)))
             
         links_this_page = links_on_page(subtree_root)
         if(links_this_page == None): # Skipping: Disambiguation page, not an article
@@ -455,8 +476,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                     tri = "conclusion (ratio of %f)" % (
                         num_future / count_wikilinks)
                     print(one + two + tri)
-            return (bfs_links_dict, construct_path(target_article, extract_path_dict(
-                    three_in_one_dict)))
+            return (bfs_links_dict, construct_path(
+                target_article, extract_path_dict(three_in_one_dict)))
 
         # return if any links on this page are REDIRECTS to target article
         redirects_in_links = link_names.intersection(TARGET_REDIRECTS)
@@ -478,8 +499,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                 print(one + two + tri)
             if verbose:
                 final_plot()
-            return (bfs_links_dict, construct_path(random_redirect,
-                                  extract_path_dict(three_in_one_dict)))
+            return (bfs_links_dict, construct_path(
+                random_redirect, extract_path_dict(three_in_one_dict)))
         
         # return if any links on this page are sectional links to target article
         matches_section = map(lambda x: re.match(target_section, x) is not
@@ -493,8 +514,8 @@ def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
                                                len(links_this_page))
             if verbose:
                 final_plot()
-            return (bfs_links_dict, construct_path(section_link,
-                                  extract_path_dict(three_in_one_dict)))
+            return (bfs_links_dict, construct_path(
+                section_link, extract_path_dict(three_in_one_dict)))
         
         # CLEAN LINKS #
         link_children = set(links_this_page.keys())
@@ -556,13 +577,12 @@ def process(s1, s2):
                   " redirect to " + article1)
         else:
             print("PROCESSING '%s' and '%s'" % (s1, s2))
-            (links_dict, resultant_path) = bfs(article1,
-                                 article2,
-                                 # term_search=(False, None),
-                                 # can use re.compile("...")
-                                 verbose=True)
-            print(resultant_path)
-            return links_dict
+            query_res = bfs(article1, article2, verbose=True)
+            if query_res is not None:
+                (links_dict, resultant_path) = query_res
+                print(resultant_path)
+                return links_dict
+            return None
 
 if is_csv_input:
     df_input = pd.read_csv("Sample Wikipedia inputs.csv")

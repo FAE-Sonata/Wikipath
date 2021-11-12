@@ -12,7 +12,12 @@ library(knitr)
 ## Intro to Concept
 "`Wikipath`" is defined with a deceptively simple goal in mind: Find _any_ shortest path linkage between two articles on the English Wikipedia.
 
-It is an augmented implementation of <a href="https://en.wikipedia.org/wiki/Breadth-first_search">Breadth-First Search (BFS)</a>.
+It is an augmented implementation of <a href="https://en.wikipedia.org/wiki/Breadth-first_search">Breadth-First Search (BFS)</a>, and where one does not know the network _a priori_.
+
+```{r echo=FALSE, fig.align='center', out.width='50%'}
+knitr::include_graphics('460px-MapGermanyGraph.png')
+knitr::include_graphics('460px-GermanyBFS.png')
+```
 
 ## Example Query
 <a href="https://en.wikipedia.org/wiki/Court_House,_Arlington,_Virginia">Court House, Arlington, Virginia</a> $\to$ <a href="https://en.wikipedia.org/wiki/Judiciary_Square_station">Judiciary Square station</a>
@@ -30,7 +35,7 @@ knitr::include_graphics('IntermediateArticle_CourtHouse_to_JudiciarySqStation.pn
 ```
 
 ## Some analytics terms, defined
-- **Number of links added**: The number of unique links newly added when visiting an article, approximately $|\text{links added}| = |\text{unique links on article}| - |Q| - |V|$, where $Q:=\{\text{links already in Queue}\}$ and $V:=\{\text{links already Visited}\}$
+- **Number of links added**: The number of unique links newly added when visiting an article, approximately $|\text{links added}| = |L| - |Q| - |V|$, where $L:=\text{unique links on article}$, $Q:=\{\text{links already in Queue}\}$ and $V:=\{\text{links already Visited}\}$
 - **Ratio of links added**, building on the prior term: $\frac{|\text{links added}|}{|\text{unique links on article}|}$
 - **Rolling $X$**: the summary statistic of the last $X$ entries in a series
 
@@ -65,7 +70,7 @@ knitr::include_graphics('../Running_plots/Zhongguancun_to_ChelseaNYC/Figure 2021
 ## Mind the asymptote!
 Query: <a href="https://en.wikipedia.org/wiki/Index_of_Singapore-related_articles">Index of Singapore-related articles</a> to <a href="https://en.wikipedia.org/wiki/Orellana_Province">Orellana Province</a>
 
-Cumulative mean series still discernible early on...
+Series of rolling 100 mean still discernible early on...
 ```{r echo=FALSE, fig.align='center', out.width='50%'}
 knitr::include_graphics('../Running_plots/SGPindex_to_Orellana/Custom/first110_nonlog.png')
 ```
@@ -83,8 +88,8 @@ ax.set_yscale('log')
 
 The variable `SWITCH_TO_LOG` is defined as $\text{SWITCH_TO_LOG} := 10^{1.5}=10\sqrt{10} \sim 31.6228$.
 ```
-redundant_first = max(mean_added) / mean_added[-1] > SWITCH_TO_LOG
-if redundant_first:
+large_first = max(mean_added) / mean_added[-1] > SWITCH_TO_LOG
+if large_first:
     ax.set_yscale('log')
     ax.set_ylim([1, max(mean_added)])
 ```
