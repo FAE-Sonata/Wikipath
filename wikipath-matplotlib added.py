@@ -258,7 +258,6 @@ def plot_ratio(arr_ratios):
     plt.show()
     return (cumulative_median, rolling_median)
 
-# Reasoning adapted from Wikipedia's article on Breadth First Search
 def bfs(origin_term, target_article, term_search=(False, None), verbose=False):
     # neither search term should be a disambiguation page; case of origin being
     # such a page handled below
